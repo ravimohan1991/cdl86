@@ -89,3 +89,14 @@ The compiler used for this project is [tcc](https://github.com/lunarjournal/tcc)
 
 Folders:
 * `tests` - CDL test suite. Run `make all`.
+
+
+# Setting up gh pages and Doxy
+- [Script](https://github.com/satu0king/Github-Documentation-With-Doxygen)
+
+
+- ## gh pages
+  [blog](https://blog.ediri.io/how-to-create-a-github-gh-pages-branch-in-an-existing-repository)
+  
+  ![image](https://github.com/ravimohan1991/cdl86/assets/2173654/7777e3d2-14da-46d9-bf12-683bb8ee9d26)
+
