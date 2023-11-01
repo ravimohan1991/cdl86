@@ -42,6 +42,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#if __APPLE__
+#define _XOPEN_SOURCE
+#endif
+
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -67,7 +71,7 @@
 #endif
 #else
 /* Check other compilers */
-#if __x86_64__
+#if __x86_64__ || __aarch64__ 
 #define ENV_64
 #else
 #define ENV_32

@@ -293,7 +293,9 @@ static uint8_t* cdl_gen_64_jmp(
     /* Generate 'mov rax', address */
     *(code + 0x0) = 0x48;
     *(code + 0x1) = 0xB8;
+
     *(uint64_t*)(code + 0x2) = (uint64_t)address;
+
     /* Generate 'jmpq *%rax' instruction. */
     *(code + 0xA) = 0xFF;
     *(code + 0xB) = 0xE0;
@@ -342,31 +344,27 @@ static uint8_t* cdl_gen_trampoline(
     /* Allocate trampoline memory pool. */
 
     #ifdef _WIN32
-
     trampoline = (uint8_t*)VirtualAlloc(NULL, size + BYTES_JMP_PATCH,
                                         MEM_COMMIT | MEM_RESERVE,
                                         PAGE_EXECUTE_READWRITE);
-
-    #else
-
+    #elif __linux__
     trampoline = (uint8_t*)mmap(NULL, size + BYTES_JMP_PATCH,
                                 PROT_READ | PROT_WRITE | PROT_EXEC,
                                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
+	#elif __APPLE__
+	//https://stackoverflow.com/questions/16254743/mmap-for-write-under-macosx-10-8-2-with-xcode-4-6-will-make-program-crashs
+	trampoline = (uint8_t*)mmap(NULL, size + BYTES_JMP_PATCH,
+								PROT_READ | PROT_WRITE,
+								MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     #endif
 
     memcpy(trampoline, bytes_orig, size);
-    /* Generate jump to address just after call
-     * to detour in trampoline. */
 
+    /* Generate jump to address (target function + 5, 12 offset) in this trampoline.*/
     #ifdef ENV_64
-
     cdl_gen_64_jmp(trampoline + size, target + size);
-
     #else
-
     cdl_gen_32_jmp(trampoline + size, target + size);
-
     #endif
 
     return trampoline;
@@ -481,7 +479,7 @@ static long NTAPI cdl_swbp_handler_win(
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-#else
+#elif __linux__
 
 /* Software breakpoint handler for linux. Handles incomming
  * SIGTRAP signal once INT3 breakpoint is hit.
@@ -548,6 +546,7 @@ struct cdl_jmp_patch cdl_jmp_attach(
 
     /* Reserve BYTES_JMP_PATCH bytes for incoming
      * patch.
+     * bytes_orig is pointer to the storage containing "popped" instructions
      */
     bytes_orig = cdl_reserve_bytes(target_origin, BYTES_JMP_PATCH, &bytes);
     jmp_patch.code = bytes_orig;
@@ -561,15 +560,10 @@ struct cdl_jmp_patch cdl_jmp_attach(
     cdl_set_page_protect(target_origin);
 
     /* Generate JMP to detour function. */
-
     #ifdef ENV_64
-
     cdl_gen_64_jmp(target_origin, (uint8_t*)detour);
-
     #else
-
     cdl_gen_32_jmp(target_origin, (uint8_t*)detour);
-
     #endif
 
     /* Fill remaining bytes with NOPs. */
@@ -648,17 +642,13 @@ struct cdl_swbp_patch cdl_swbp_attach(
          */
 
         #ifdef _WIN32
-
         vector_handler = AddVectoredExceptionHandler(1, &cdl_swbp_handler_win);
-
-        #else
-
+        #elif __linux__
         struct sigaction sa = {0};
         sa.sa_flags = SA_SIGINFO | SA_ONESHOT;
         sa.sa_sigaction = (void*)cdl_swbp_handler_linux;
         sigaction(SIGTRAP, &sa, NULL);
         cdl_swbp_init = true;
-
         #endif
     }
 
